@@ -694,10 +694,41 @@
     let selectedCategory = '餐饮';
 
     function loadState() {
+      // 1. 先检查新版 key 是否已有数据
       const saved = localStorage.getItem('cycle_ledger_data_v1');
       if (saved) {
         try {
-          state = JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
+            state = parsed;
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // 2. 自动扫描浏览器里第一版留下的所有旧数据 key 并无损迁移
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || key === 'cycle_ledger_data_v1') continue;
+        try {
+          const raw = localStorage.getItem(key);
+          const data = JSON.parse(raw);
+          // 识别出包含记账数组的结构（兼容不同字段命名）
+          const list = Array.isArray(data) ? data : (data && (data.records || data.transactions || data.list));
+          if (Array.isArray(list) && list.length > 0) {
+            state.records = list.map((item, idx) => ({
+              id: item.id || (Date.now() + idx),
+              type: item.type || 'expense',
+              category: item.category || '其他',
+              amount: Number(item.amount) || 0,
+              date: item.date || formatDate(new Date()),
+              note: item.note || item.desc || item.remark || ''
+            }));
+            if (data.startDay) state.startDay = Number(data.startDay);
+            if (data.budget) state.budget = Number(data.budget);
+            saveState(); // 迁移后保存到新版 key
+            break;
+          }
         } catch (e) {}
       }
     }
