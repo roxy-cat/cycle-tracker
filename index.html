@@ -3,16 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#2563eb" />
+  <meta name="theme-color" id="metaThemeColor" content="#10b981" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>周期记 - CycleLedger</title>
   <link rel="manifest" href="./manifest.json" />
   <style>
     :root {
-      --primary: #2563eb;
-      --primary-light: #eff6ff;
-      --bg: #f8fafc;
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --primary-light: #ecfdf5;
+      --primary-shadow: rgba(16, 185, 129, 0.28);
+      --bg: #f4f7f5;
       --card: #ffffff;
       --text-main: #0f172a;
       --text-sub: #64748b;
@@ -34,8 +36,8 @@
       color: var(--text-main);
       line-height: 1.5;
       padding-top: env(safe-area-inset-top);
-      /* 底部预留足够空间，防止最后一条账单被悬浮按钮遮挡 */
-      padding-bottom: calc(100px + env(safe-area-inset-bottom));
+      padding-bottom: calc(104px + env(safe-area-inset-bottom));
+      transition: background-color 0.25s ease;
     }
 
     .container {
@@ -49,7 +51,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .header h1 {
@@ -63,7 +65,7 @@
     .badge {
       font-size: 11px;
       background: var(--primary-light);
-      color: var(--primary);
+      color: var(--primary-dark);
       padding: 2px 8px;
       border-radius: 99px;
       font-weight: 600;
@@ -73,8 +75,9 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 14px;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 500;
       color: var(--text-main);
       cursor: pointer;
       display: flex;
@@ -122,23 +125,25 @@
 
     .reset-cycle-btn {
       font-size: 11px;
-      color: var(--primary);
+      color: var(--primary-dark);
       background: var(--primary-light);
       border: none;
       padding: 2px 8px;
       border-radius: 6px;
       margin-left: 6px;
       cursor: pointer;
+      font-weight: 600;
     }
 
     /* 概览卡片 */
     .summary-card {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
       color: #ffffff;
       border-radius: 18px;
       padding: 20px;
       margin-bottom: 16px;
-      box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.3);
+      box-shadow: 0 10px 25px -5px var(--primary-shadow);
+      transition: background 0.25s ease, box-shadow 0.25s ease;
     }
 
     .summary-top {
@@ -150,7 +155,7 @@
 
     .summary-label {
       font-size: 13px;
-      opacity: 0.85;
+      opacity: 0.9;
     }
 
     .summary-amount {
@@ -166,6 +171,7 @@
       border-radius: 10px;
       font-size: 12px;
       text-align: right;
+      backdrop-filter: blur(4px);
     }
 
     .progress-bg {
@@ -187,7 +193,7 @@
       display: flex;
       justify-content: space-between;
       font-size: 13px;
-      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      border-top: 1px solid rgba(255, 255, 255, 0.18);
       padding-top: 12px;
     }
 
@@ -219,7 +225,7 @@
     .filter-bar {
       display: flex;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
 
     .filter-bar input {
@@ -227,6 +233,7 @@
       padding: 8px 12px;
       border-radius: 10px;
       border: 1px solid var(--border);
+      background: var(--card);
       font-size: 13px;
       outline: none;
     }
@@ -239,54 +246,95 @@
       font-size: 13px;
     }
 
-    /* 账单列表 */
-    .record-list {
+    /* ✅ 按天分组的账单卡片样式 */
+    .day-groups {
       display: flex;
       flex-direction: column;
+      gap: 14px;
+    }
+
+    .day-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.02);
+    }
+
+    .day-header {
+      background: #f8fafc;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .day-date-label {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .day-totals {
+      display: flex;
       gap: 10px;
+      font-size: 12px;
     }
 
     .record-item {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
       padding: 12px 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .record-item:last-child {
+      border-bottom: none;
     }
 
     .record-left {
       display: flex;
       align-items: center;
       gap: 12px;
+      min-width: 0;
     }
 
     .cat-icon {
       width: 40px;
       height: 40px;
       border-radius: 12px;
-      background: var(--bg);
+      background: var(--primary-light);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 20px;
+      flex-shrink: 0;
     }
 
     .record-title {
       font-size: 15px;
       font-weight: 600;
+      color: var(--text-main);
     }
 
-    .record-meta {
+    .record-note {
       font-size: 12px;
       color: var(--text-sub);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
     }
 
     .record-right {
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
     }
 
     .record-amount {
@@ -295,13 +343,13 @@
     }
 
     .record-amount.expense { color: var(--text-main); }
-    .record-amount.income { color: var(--income); }
+    .record-amount.income { color: var(--primary-dark); }
 
     .del-btn {
       background: none;
       border: none;
       color: #cbd5e1;
-      font-size: 16px;
+      font-size: 15px;
       cursor: pointer;
       padding: 4px;
     }
@@ -316,14 +364,14 @@
     }
 
     .stat-row {
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
 
     .stat-row-top {
       display: flex;
       justify-content: space-between;
       font-size: 13px;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
     }
 
     .stat-bar-bg {
@@ -339,7 +387,7 @@
       border-radius: 99px;
     }
 
-    /* ✅ 核心改进：固定悬浮在屏幕右下角的“记一笔”按钮 */
+    /* 右下角悬浮“记一笔”按钮 */
     .fab-add {
       position: fixed;
       right: 20px;
@@ -353,12 +401,12 @@
       padding: 0 22px;
       font-size: 16px;
       font-weight: 600;
-      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.38);
+      box-shadow: 0 8px 20px var(--primary-shadow);
       display: flex;
       align-items: center;
       gap: 6px;
       cursor: pointer;
-      transition: transform 0.15s ease;
+      transition: transform 0.15s ease, background 0.25s ease;
     }
 
     .fab-add:active {
@@ -387,6 +435,8 @@
       border-radius: 20px 20px 0 0;
       padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
       animation: slideUp 0.2s ease;
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
     @keyframes slideUp {
@@ -438,7 +488,7 @@
     .type-btn.active {
       background: var(--card);
       box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-      color: var(--primary);
+      color: var(--primary-dark);
     }
 
     .cat-grid {
@@ -461,27 +511,67 @@
     .cat-chip.active {
       border-color: var(--primary);
       background: var(--primary-light);
-      color: var(--primary);
+      color: var(--primary-dark);
       font-weight: 600;
     }
 
+    /* 主题色选择器 */
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .theme-chip {
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--card);
+    }
+
+    .theme-chip.active {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .theme-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
     .form-group {
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
 
     .form-group label {
       display: block;
       font-size: 12px;
       color: var(--text-sub);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
     }
 
-    .form-group input {
+    .form-group input[type="number"],
+    .form-group input[type="date"],
+    .form-group input[type="text"] {
       width: 100%;
       padding: 10px 12px;
       border: 1px solid var(--border);
       border-radius: 10px;
       font-size: 15px;
+    }
+
+    .form-group input[type="range"] {
+      width: 100%;
+      accent-color: var(--primary);
     }
 
     .submit-btn {
@@ -494,7 +584,7 @@
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     .backup-actions {
@@ -530,7 +620,7 @@
     <!-- 顶部栏 -->
     <div class="header">
       <h1>周期记 <span class="badge" id="cycleBadge">每月15日结转</span></h1>
-      <button class="icon-btn" onclick="openSettings()">⚙️ 周期与备份</button>
+      <button class="icon-btn" onclick="openSettings()">⚙️ 设置与主题</button>
     </div>
 
     <!-- 周期切换 -->
@@ -584,7 +674,7 @@
           <option value="income">仅看收入</option>
         </select>
       </div>
-      <div class="record-list" id="recordList"></div>
+      <div class="day-groups" id="recordList"></div>
     </div>
 
     <!-- 统计视图 -->
@@ -625,23 +715,28 @@
 
       <div class="form-group">
         <label>备注 (选填)</label>
-        <input type="text" id="noteInput" placeholder="例如：午餐、买书、生活费..." />
+        <input type="text" id="noteInput" placeholder="例如：午餐、稿纸、生活费..." />
       </div>
 
       <button class="submit-btn" onclick="saveRecord()">保存记录</button>
     </div>
   </div>
 
-  <!-- 周期与数据备份弹窗 -->
+  <!-- 周期、主题与数据备份弹窗 -->
   <div class="modal-mask" id="settingsModal" onclick="closeModalOnMask(event, 'settingsModal')">
     <div class="modal-panel">
       <div class="modal-header">
-        <span class="modal-title">周期设置与数据备份</span>
+        <span class="modal-title">周期、主题与备份</span>
         <button class="close-btn" onclick="closeModal('settingsModal')">✕</button>
       </div>
 
       <div class="form-group">
-        <label>每月记账起始日 (发薪日 / 生活费发放日)：<strong id="startDayLabel" style="color:var(--primary);">15号</strong></label>
+        <label>外观主题配色（点击即时预览）</label>
+        <div class="theme-grid" id="themeGrid"></div>
+      </div>
+
+      <div class="form-group">
+        <label>每月记账起始日 (发薪日 / 生活费日)：<strong id="startDayLabel" style="color:var(--primary-dark);">15号</strong></label>
         <input type="range" id="startDayInput" min="1" max="28" value="15" oninput="document.getElementById('startDayLabel').innerText = this.value + '号'" />
       </div>
 
@@ -661,6 +756,58 @@
   </div>
 
   <script>
+    // 多色主题配置（默认：清新白绿）
+    const THEMES = {
+      green: {
+        name: '清新白绿',
+        primary: '#10b981',
+        dark: '#059669',
+        light: '#ecfdf5',
+        bg: '#f4f7f5',
+        shadow: 'rgba(16, 185, 129, 0.28)'
+      },
+      blue: {
+        name: '晴空湛蓝',
+        primary: '#2563eb',
+        dark: '#1d4ed8',
+        light: '#eff6ff',
+        bg: '#f8fafc',
+        shadow: 'rgba(37, 99, 235, 0.28)'
+      },
+      pink: {
+        name: '樱花柔粉',
+        primary: '#ec4899',
+        dark: '#db2777',
+        light: '#fdf2f8',
+        bg: '#fdf8fa',
+        shadow: 'rgba(236, 72, 153, 0.25)'
+      },
+      orange: {
+        name: '暖阳活力',
+        primary: '#f97316',
+        dark: '#ea580c',
+        light: '#fff7ed',
+        bg: '#faf8f6',
+        shadow: 'rgba(249, 115, 22, 0.25)'
+      },
+      purple: {
+        name: '香芋微紫',
+        primary: '#8b5cf6',
+        dark: '#7c3aed',
+        light: '#f5f3ff',
+        bg: '#f8f7fc',
+        shadow: 'rgba(139, 92, 246, 0.25)'
+      },
+      dark: {
+        name: '极简石墨',
+        primary: '#334155',
+        dark: '#0f172a',
+        light: '#f1f5f9',
+        bg: '#f8fafc',
+        shadow: 'rgba(15, 23, 42, 0.22)'
+      }
+    };
+
     const CATEGORIES = {
       expense: [
         { name: '餐饮', icon: '🍜' },
@@ -682,9 +829,40 @@
       ]
     };
 
+    // 兼容旧版英文分类键值到中文名称的自动映射
+    const LEGACY_CAT_MAP = {
+      food: '餐饮',
+      dining: '餐饮',
+      transport: '交通',
+      traffic: '交通',
+      shopping: '购物',
+      entertainment: '娱乐',
+      game: '娱乐',
+      study: '学习',
+      education: '学习',
+      housing: '居住',
+      rent: '居住',
+      medical: '医疗',
+      health: '医疗',
+      other: '其他',
+      salary: '工资',
+      allowance: '生活费',
+      parttime: '兼职',
+      finance: '理财',
+      redpacket: '红包',
+      gift: '红包'
+    };
+
+    function normalizeCategory(rawCat) {
+      if (!rawCat) return '其他';
+      const lower = String(rawCat).trim().toLowerCase();
+      return LEGACY_CAT_MAP[lower] || rawCat;
+    }
+
     let state = {
       startDay: 15,
       budget: 3000,
+      theme: 'green',
       records: []
     };
 
@@ -693,40 +871,77 @@
     let currentRecordType = 'expense';
     let selectedCategory = '餐饮';
 
+    function applyTheme(themeKey) {
+      const t = THEMES[themeKey] || THEMES.green;
+      const root = document.documentElement.style;
+      root.setProperty('--primary', t.primary);
+      root.setProperty('--primary-dark', t.dark);
+      root.setProperty('--primary-light', t.light);
+      root.setProperty('--primary-shadow', t.shadow);
+      root.setProperty('--bg', t.bg);
+      const meta = document.getElementById('metaThemeColor');
+      if (meta) meta.setAttribute('content', t.primary);
+    }
+
+    function selectTheme(themeKey) {
+      state.theme = themeKey;
+      applyTheme(themeKey);
+      saveState();
+      renderThemeGrid();
+    }
+
+    function renderThemeGrid() {
+      const grid = document.getElementById('themeGrid');
+      if (!grid) return;
+      grid.innerHTML = Object.entries(THEMES).map(([key, t]) => `
+        <div class="theme-chip ${state.theme === key ? 'active' : ''}" onclick="selectTheme('${key}')">
+          <span class="theme-dot" style="background:${t.primary};"></span>
+          <span>${t.name}</span>
+        </div>
+      `).join('');
+    }
+
     function loadState() {
-      // 1. 先检查新版 key 是否已有数据
       const saved = localStorage.getItem('cycle_ledger_data_v1');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (parsed && Array.isArray(parsed.records) && parsed.records.length > 0) {
-            state = parsed;
+          if (parsed && Array.isArray(parsed.records)) {
+            state = {
+              startDay: parsed.startDay || 15,
+              budget: parsed.budget !== undefined ? parsed.budget : 3000,
+              theme: parsed.theme || 'green',
+              // 自动将之前迁移过来的英文分类（如 food, study）修正为中文并恢复图标
+              records: parsed.records.map(r => ({
+                ...r,
+                category: normalizeCategory(r.category)
+              }))
+            };
+            saveState();
             return;
           }
         } catch (e) {}
       }
 
-      // 2. 自动扫描浏览器里第一版留下的所有旧数据 key 并无损迁移
+      // 兜底：若仍未迁移过旧数据，扫描旧存储键
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (!key || key === 'cycle_ledger_data_v1') continue;
         try {
-          const raw = localStorage.getItem(key);
-          const data = JSON.parse(raw);
-          // 识别出包含记账数组的结构（兼容不同字段命名）
+          const data = JSON.parse(localStorage.getItem(key));
           const list = Array.isArray(data) ? data : (data && (data.records || data.transactions || data.list));
           if (Array.isArray(list) && list.length > 0) {
             state.records = list.map((item, idx) => ({
               id: item.id || (Date.now() + idx),
               type: item.type || 'expense',
-              category: item.category || '其他',
+              category: normalizeCategory(item.category),
               amount: Number(item.amount) || 0,
               date: item.date || formatDate(new Date()),
               note: item.note || item.desc || item.remark || ''
             }));
             if (data.startDay) state.startDay = Number(data.startDay);
             if (data.budget) state.budget = Number(data.budget);
-            saveState(); // 迁移后保存到新版 key
+            saveState();
             break;
           }
         } catch (e) {}
@@ -742,6 +957,16 @@
       const m = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       return `${y}-${m}-${day}`;
+    }
+
+    function formatDayHeader(dateStr) {
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const weeks = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+      const todayStr = formatDate(new Date());
+      const tag = dateStr === todayStr ? ' · 今天' : '';
+      return `${Number(parts[1])}月${Number(parts[2])}日 ${weeks[d.getDay()]}${tag}`;
     }
 
     function getCycleRange(offset = 0) {
@@ -823,6 +1048,7 @@
       }
     }
 
+    // ✅ 按天分组渲染，每天独立成组并展示当日收支合计
     function renderRecords(cycleRecords) {
       const kw = document.getElementById('searchInput').value.trim().toLowerCase();
       const tf = document.getElementById('typeFilter').value;
@@ -838,22 +1064,47 @@
         return;
       }
 
-      listEl.innerHTML = filtered.map(r => {
-        const catObj = [...CATEGORIES.expense, ...CATEGORIES.income].find(c => c.name === r.category) || { icon: '📝' };
-        const sign = r.type === 'expense' ? '-' : '+';
-        return `
-          <div class="record-item">
-            <div class="record-left">
-              <div class="cat-icon">${catObj.icon}</div>
-              <div>
-                <div class="record-title">${r.category} ${r.note ? `· <span style="font-weight:400;font-size:13px;color:var(--text-sub);">${escapeHtml(r.note)}</span>` : ''}</div>
-                <div class="record-meta">${r.date}</div>
+      // 按日期聚合
+      const groups = {};
+      filtered.forEach(r => {
+        if (!groups[r.date]) groups[r.date] = [];
+        groups[r.date].push(r);
+      });
+
+      listEl.innerHTML = Object.entries(groups).map(([date, items]) => {
+        const dayExp = items.filter(i => i.type === 'expense').reduce((s, i) => s + i.amount, 0);
+        const dayInc = items.filter(i => i.type === 'income').reduce((s, i) => s + i.amount, 0);
+
+        const rowsHtml = items.map(r => {
+          const catObj = [...CATEGORIES.expense, ...CATEGORIES.income].find(c => c.name === r.category) || { icon: '📦' };
+          const sign = r.type === 'expense' ? '-' : '+';
+          return `
+            <div class="record-item">
+              <div class="record-left">
+                <div class="cat-icon">${catObj.icon}</div>
+                <div>
+                  <div class="record-title">${escapeHtml(r.category)}</div>
+                  ${r.note ? `<div class="record-note">${escapeHtml(r.note)}</div>` : ''}
+                </div>
+              </div>
+              <div class="record-right">
+                <div class="record-amount ${r.type}">${sign}¥${r.amount.toFixed(2)}</div>
+                <button class="del-btn" onclick="deleteRecord(${r.id})" title="删除">✕</button>
               </div>
             </div>
-            <div class="record-right">
-              <div class="record-amount ${r.type}">${sign}¥${r.amount.toFixed(2)}</div>
-              <button class="del-btn" onclick="deleteRecord(${r.id})" title="删除">✕</button>
+          `;
+        }).join('');
+
+        return `
+          <div class="day-card">
+            <div class="day-header">
+              <span class="day-date-label">${formatDayHeader(date)}</span>
+              <div class="day-totals">
+                ${dayExp > 0 ? `<span>支 <strong>¥${dayExp.toFixed(2)}</strong></span>` : ''}
+                ${dayInc > 0 ? `<span style="color:var(--primary-dark);">收 <strong>¥${dayInc.toFixed(2)}</strong></span>` : ''}
+              </div>
             </div>
+            <div>${rowsHtml}</div>
           </div>
         `;
       }).join('');
@@ -880,7 +1131,7 @@
           return `
             <div class="stat-row">
               <div class="stat-row-top">
-                <span>${catObj.icon} ${cat} (${pct}%)</span>
+                <span>${catObj.icon} ${escapeHtml(cat)} (${pct}%)</span>
                 <strong>¥${amt.toFixed(2)}</strong>
               </div>
               <div class="stat-bar-bg">
@@ -892,7 +1143,7 @@
     }
 
     function escapeHtml(str) {
-      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
     }
 
     function openAddModal() {
@@ -962,6 +1213,7 @@
     }
 
     function openSettings() {
+      renderThemeGrid();
       document.getElementById('startDayInput').value = state.startDay;
       document.getElementById('startDayLabel').innerText = `${state.startDay}号`;
       document.getElementById('budgetInput').value = state.budget;
@@ -999,10 +1251,15 @@
           if (Array.isArray(parsed.records)) {
             state = {
               startDay: parsed.startDay || 15,
-              budget: parsed.budget || 3000,
-              records: parsed.records
+              budget: parsed.budget !== undefined ? parsed.budget : 3000,
+              theme: parsed.theme || state.theme || 'green',
+              records: parsed.records.map(r => ({
+                ...r,
+                category: normalizeCategory(r.category)
+              }))
             };
             saveState();
+            applyTheme(state.theme);
             closeModal('settingsModal');
             render();
             alert('数据恢复成功！');
@@ -1025,7 +1282,6 @@
       if (e.target.id === id) closeModal(id);
     }
 
-    // 注册 Service Worker 以支持 PWA 和 APK 打包
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -1033,6 +1289,7 @@
     }
 
     loadState();
+    applyTheme(state.theme);
     render();
   </script>
 </body>
