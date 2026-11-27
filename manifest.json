@@ -1,0 +1,19 @@
+{
+  "name": "周期记 CycleLedger",
+  "short_name": "周期记",
+  "description": "支持自定义发薪日与生活费结转周期的轻量化记账本",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f5",
+  "theme_color": "#10b981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2344/2344132.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
