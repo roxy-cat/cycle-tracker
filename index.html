@@ -1,1236 +1,1008 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>周期记 - 自定义发薪日智能记账</title>
-    <!-- 引入 Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Lucide 图标库 -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- 引入 Inter 字体与中文字体优化 -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#ecfdf5',
-                            100: '#d1fae5',
-                            500: '#10b981', // 治愈薄荷绿
-                            600: '#059669',
-                            700: '#047857',
-                        },
-                        accent: {
-                            500: '#6366f1', // 现代靛蓝
-                            600: '#4f46e5',
-                        }
-                    },
-                    boxShadow: {
-                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
-                        'float': '0 10px 25px -5px rgba(16, 185, 129, 0.35)',
-                        'phone': '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        /* 自定义滚动条隐藏，保持小程序清爽质感 */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        /* 数字等宽对齐 */
-        .tabular-nums {
-            font-variant-numeric: tabular-nums;
-        }
-        /* 弹窗过渡动画 */
-        .modal-backdrop {
-            transition: opacity 0.25s ease;
-        }
-        .modal-panel {
-            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        /* 桌面端背景纹理 */
-        @media (min-width: 640px) {
-            body {
-                background-color: #eef2f6;
-                background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-                background-size: 24px 24px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>周期记 - CycleLedger</title>
+  <link rel="manifest" href="./manifest.json" />
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text-main: #0f172a;
+      --text-sub: #64748b;
+      --border: #e2e8f0;
+      --expense: #ef4444;
+      --income: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-top: env(safe-area-inset-top);
+      /* 底部预留足够空间，防止最后一条账单被悬浮按钮遮挡 */
+      padding-bottom: calc(100px + env(safe-area-inset-bottom));
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* 顶部导航 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge {
+      font-size: 11px;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-weight: 600;
+    }
+
+    .icon-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 14px;
+      color: var(--text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* 周期切换器 */
+    .cycle-bar {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+
+    .cycle-nav-btn {
+      background: var(--bg);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .cycle-info {
+      text-align: center;
+    }
+
+    .cycle-dates {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .cycle-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .reset-cycle-btn {
+      font-size: 11px;
+      color: var(--primary);
+      background: var(--primary-light);
+      border: none;
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-left: 6px;
+      cursor: pointer;
+    }
+
+    /* 概览卡片 */
+    .summary-card {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.3);
+    }
+
+    .summary-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .summary-label {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+
+    .summary-amount {
+      font-size: 32px;
+      font-weight: 700;
+      margin-top: 2px;
+      letter-spacing: -0.5px;
+    }
+
+    .daily-tag {
+      background: rgba(255, 255, 255, 0.18);
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .progress-bg {
+      background: rgba(255, 255, 255, 0.25);
+      height: 6px;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .progress-fill {
+      background: #ffffff;
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.3s ease;
+    }
+
+    .summary-bottom {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      padding-top: 12px;
+    }
+
+    /* 筛选与标签切换 */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 9px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-sub);
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .filter-bar input {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .filter-bar select {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      font-size: 13px;
+    }
+
+    /* 账单列表 */
+    .record-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .record-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .record-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .record-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .record-meta {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .record-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .record-amount {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .record-amount.expense { color: var(--text-main); }
+    .record-amount.income { color: var(--income); }
+
+    .del-btn {
+      background: none;
+      border: none;
+      color: #cbd5e1;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .del-btn:hover { color: var(--expense); }
+
+    /* 统计图表区域 */
+    .stats-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .stat-row {
+      margin-bottom: 12px;
+    }
+
+    .stat-row-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .stat-bar-bg {
+      background: var(--bg);
+      height: 8px;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .stat-bar-fill {
+      background: var(--primary);
+      height: 100%;
+      border-radius: 99px;
+    }
+
+    /* ✅ 核心改进：固定悬浮在屏幕右下角的“记一笔”按钮 */
+    .fab-add {
+      position: fixed;
+      right: 20px;
+      bottom: calc(24px + env(safe-area-inset-bottom));
+      z-index: 900;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 99px;
+      height: 54px;
+      padding: 0 22px;
+      font-size: 16px;
+      font-weight: 600;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.38);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .fab-add:active {
+      transform: scale(0.95);
+    }
+
+    /* 弹窗样式 */
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      z-index: 1000;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-mask.show {
+      display: flex;
+    }
+
+    .modal-panel {
+      background: var(--card);
+      width: 100%;
+      max-width: 480px;
+      border-radius: 20px 20px 0 0;
+      padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
+      animation: slideUp 0.2s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .modal-title {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .close-btn {
+      background: var(--bg);
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .type-switch {
+      display: flex;
+      background: var(--bg);
+      padding: 4px;
+      border-radius: 10px;
+      margin-bottom: 14px;
+    }
+
+    .type-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .type-btn.active {
+      background: var(--card);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      color: var(--primary);
+    }
+
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .cat-chip {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 12px;
+      cursor: pointer;
+      background: var(--card);
+    }
+
+    .cat-chip.active {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-bottom: 4px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 15px;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    .backup-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .secondary-btn {
+      flex: 1;
+      padding: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .empty-tip {
+      text-align: center;
+      color: var(--text-sub);
+      padding: 40px 0;
+      font-size: 14px;
+    }
+  </style>
 </head>
-<body class="text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-700">
-
-    <!-- 移动端全屏 / 桌面端居中手机容器 -->
-    <div id="app" class="relative mx-auto w-full sm:w-[420px] min-h-screen sm:min-h-[844px] sm:h-[844px] sm:my-6 bg-[#f7f8fa] sm:rounded-[38px] sm:shadow-phone sm:border-[8px] sm:border-slate-900/90 flex flex-col overflow-hidden">
-        
-        <!-- 顶部状态栏装饰 (仅桌面端展示模拟刘海/状态栏) -->
-        <div class="hidden sm:flex justify-between items-center px-6 pt-3 pb-1 bg-white text-xs font-semibold text-slate-700 select-none">
-            <span id="clockDisplay">09:41</span>
-            <div class="w-20 h-4 bg-slate-900 rounded-full"></div>
-            <div class="flex items-center gap-1.5">
-                <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
-                <i data-lucide="battery-full" class="w-4 h-4"></i>
-            </div>
-        </div>
-
-        <!-- 顶部导航栏 & 周期控制器 -->
-        <header class="bg-white px-5 pt-4 pb-3 border-b border-slate-100 z-10 shrink-0">
-            <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-500 flex items-center justify-center text-white shadow-sm">
-                        <i data-lucide="calendar-range" class="w-4 h-4"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-base font-bold tracking-tight text-slate-900 leading-none">周期记</h1>
-                        <span class="text-[11px] text-slate-400 font-medium" id="headerRuleTag">每月 15 日起算</span>
-                    </div>
-                </div>
-                
-                <!-- 右侧快捷按钮：回到本期 & 设置 -->
-                <div class="flex items-center gap-2">
-                    <button id="btnResetCycle" onclick="resetToCurrentCycle()" class="hidden text-xs font-medium px-2.5 py-1.5 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 transition active:scale-95">
-                        回本期
-                    </button>
-                    <button onclick="openSettingsModal()" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 transition active:scale-95" title="周期与预算设置">
-                        <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- 周期切换器 -->
-            <div class="flex items-center justify-between bg-slate-50 rounded-2xl p-1.5 border border-slate-200/60">
-                <button onclick="changeCycle(-1)" class="p-2 rounded-xl hover:bg-white hover:shadow-xs text-slate-600 transition active:scale-90" aria-label="上一周期">
-                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                </button>
-                
-                <div class="text-center">
-                    <div class="flex items-center justify-center gap-1.5">
-                        <span id="cycleRangeText" class="text-sm font-bold text-slate-800 tabular-nums">11月15日 - 12月14日</span>
-                        <span id="cycleStatusBadge" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-brand-100 text-brand-700">当前周期</span>
-                    </div>
-                    <p id="cycleCountdownText" class="text-[11px] text-slate-500 mt-0.5">距离下个发薪日还有 <span class="font-semibold text-brand-600">22</span> 天</p>
-                </div>
-
-                <button onclick="changeCycle(1)" class="p-2 rounded-xl hover:bg-white hover:shadow-xs text-slate-600 transition active:scale-90" aria-label="下一周期">
-                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                </button>
-            </div>
-        </header>
-
-        <!-- 主内容滚动区 -->
-        <main class="flex-1 overflow-y-auto no-scrollbar px-4 pt-4 pb-28 space-y-4">
-            
-            <!-- 核心财务仪表盘卡片 -->
-            <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-5 text-white shadow-soft relative overflow-hidden">
-                <!-- 背景装饰光晕 -->
-                <div class="absolute -right-8 -top-8 w-36 h-36 bg-brand-500/20 rounded-full blur-2xl pointer-events-none"></div>
-                <div class="absolute -left-8 -bottom-8 w-32 h-32 bg-accent-500/20 rounded-full blur-2xl pointer-events-none"></div>
-
-                <div class="relative z-10">
-                    <!-- 顶部：剩余预算与日均可用 -->
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <div class="flex items-center gap-1.5 text-slate-300 text-xs mb-1">
-                                <span>本周期剩余预算</span>
-                                <button onclick="openSettingsModal()" class="text-slate-400 hover:text-white transition">
-                                    <i data-lucide="pencil" class="w-3 h-3"></i>
-                                </button>
-                            </div>
-                            <div id="dashRemainingBudget" class="text-3xl font-bold tracking-tight tabular-nums text-white">
-                                ¥2,450.00
-                            </div>
-                        </div>
-                        <div class="text-right bg-white/10 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/10">
-                            <div class="text-[10px] text-slate-300" id="dailyAllowanceLabel">剩余日均可用</div>
-                            <div id="dashDailyAllowance" class="text-sm font-bold text-brand-400 tabular-nums mt-0.5">¥111.36</div>
-                        </div>
-                    </div>
-
-                    <!-- 预算进度条 -->
-                    <div class="mb-4">
-                        <div class="flex justify-between text-[11px] text-slate-300 mb-1.5 tabular-nums">
-                            <span>已用 <span id="dashBudgetPercent" class="font-semibold text-white">38%</span></span>
-                            <span>总预算 <span id="dashTotalBudget">¥4,000.00</span></span>
-                        </div>
-                        <div class="w-full h-2.5 bg-white/15 rounded-full overflow-hidden p-0.5">
-                            <div id="dashProgressBar" class="h-full rounded-full bg-gradient-to-r from-brand-400 to-emerald-300 transition-all duration-500" style="width: 38%"></div>
-                        </div>
-                    </div>
-
-                    <!-- 底部：本周期总支出 & 总收入 -->
-                    <div class="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-8 h-8 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
-                                <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
-                            </div>
-                            <div>
-                                <div class="text-[11px] text-slate-400">本周期支出</div>
-                                <div id="dashTotalExpense" class="text-sm font-bold tabular-nums text-white">¥1,550.00</div>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                                <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
-                            </div>
-                            <div>
-                                <div class="text-[11px] text-slate-400">本周期收入</div>
-                                <div id="dashTotalIncome" class="text-sm font-bold tabular-nums text-emerald-400">¥6,500.00</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 视图切换 Tabs (明细 vs 统计) -->
-            <div class="flex items-center justify-between gap-2">
-                <div class="bg-slate-200/70 p-1 rounded-2xl flex flex-1">
-                    <button id="tabTransactions" onclick="switchView('transactions')" class="flex-1 py-2 text-xs font-semibold rounded-xl bg-white text-slate-900 shadow-xs transition flex items-center justify-center gap-1.5">
-                        <i data-lucide="list-ordered" class="w-3.5 h-3.5 text-brand-600"></i>
-                        <span>账单明细</span>
-                    </button>
-                    <button id="tabStats" onclick="switchView('stats')" class="flex-1 py-2 text-xs font-semibold rounded-xl text-slate-500 hover:text-slate-700 transition flex items-center justify-center gap-1.5">
-                        <i data-lucide="pie-chart" class="w-3.5 h-3.5"></i>
-                        <span>周期统计</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- 视图 1：账单明细列表 -->
-            <div id="viewTransactions" class="space-y-3">
-                <!-- 搜索与筛选栏 -->
-                <div class="flex gap-2">
-                    <div class="relative flex-1">
-                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-                        <input type="text" id="searchInput" oninput="renderTransactions()" placeholder="搜索备注或分类..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition">
-                    </div>
-                    <select id="filterTypeSelect" onchange="renderTransactions()" class="px-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-medium text-slate-600 focus:outline-none focus:border-brand-500">
-                        <option value="all">全部类型</option>
-                        <option value="expense">仅看支出</option>
-                        <option value="income">仅看收入</option>
-                    </select>
-                </div>
-
-                <!-- 按日分组的账单容器 -->
-                <div id="transactionListContainer" class="space-y-3">
-                    <!-- 动态渲染账单列表 -->
-                </div>
-            </div>
-
-            <!-- 视图 2：周期数据统计 -->
-            <div id="viewStats" class="hidden space-y-4">
-                <!-- 统计类型切换 -->
-                <div class="bg-white rounded-3xl p-5 shadow-soft border border-slate-100">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-bold text-slate-800">分类构成分析</h3>
-                        <div class="inline-flex bg-slate-100 p-0.5 rounded-xl text-xs">
-                            <button id="statTypeExpense" onclick="switchStatType('expense')" class="px-3 py-1 rounded-lg font-semibold bg-white text-slate-800 shadow-2xs transition">支出</button>
-                            <button id="statTypeIncome" onclick="switchStatType('income')" class="px-3 py-1 rounded-lg font-semibold text-slate-500 transition">收入</button>
-                        </div>
-                    </div>
-
-                    <!-- 环形图表区域 (原生 SVG 动态渲染，无外部依赖风险) -->
-                    <div id="chartContainer" class="flex flex-col items-center justify-center py-2">
-                        <!-- SVG 环形图将在此生成 -->
-                    </div>
-
-                    <!-- 分类排行榜列表 -->
-                    <div id="categoryBreakdownList" class="mt-4 space-y-3 pt-4 border-t border-slate-100">
-                        <!-- 动态渲染分类占比条 -->
-                    </div>
-                </div>
-
-                <!-- 周期总结小贴士 -->
-                <div class="bg-brand-50/80 border border-brand-100 rounded-2xl p-4 flex items-start gap-3">
-                    <div class="w-8 h-8 rounded-xl bg-brand-500 text-white flex items-center justify-center shrink-0 mt-0.5">
-                        <i data-lucide="sparkles" class="w-4 h-4"></i>
-                    </div>
-                    <div>
-                        <h4 class="text-xs font-bold text-brand-900">周期财务洞察</h4>
-                        <p id="statsInsightText" class="text-xs text-brand-700 mt-1 leading-relaxed">
-                            当前周期消费节奏平稳，继续保持每日预算规划，月底预计可结余一笔可观资金。
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-        </main>
-
-        <!-- 底部悬浮栏：快捷记账按钮 -->
-        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#f7f8fa] via-[#f7f8fa]/95 to-transparent pt-4 pb-6 px-6 flex justify-center items-center pointer-events-none z-20">
-            <button onclick="openRecordModal()" class="pointer-events-auto flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 text-white font-semibold px-7 py-3.5 rounded-full shadow-float transition transform active:scale-95">
-                <i data-lucide="plus" class="w-5 h-5 stroke-[2.5]"></i>
-                <span class="text-sm tracking-wide">记一笔</span>
-            </button>
-        </div>
-
-        <!-- 全局轻提示 Toast (替代 alert) -->
-        <div id="toast" class="fixed top-12 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2">
-            <div class="bg-slate-900/90 backdrop-blur-md text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2">
-                <i data-lucide="check-circle-2" class="w-4 h-4 text-brand-400"></i>
-                <span id="toastMessage">操作成功</span>
-            </div>
-        </div>
-
-        <!-- ==================== 弹窗 1：记一笔面板 ==================== -->
-        <div id="recordModal" class="hidden fixed sm:absolute inset-0 z-40 flex flex-col justify-end">
-            <div onclick="closeRecordModal()" class="modal-backdrop fixed sm:absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"></div>
-            <div class="modal-panel relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl z-10 max-h-[90%] overflow-y-auto no-scrollbar">
-                <!-- 顶部拖拽指示条与关闭 -->
-                <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
-                
-                <div class="flex items-center justify-between mb-4">
-                    <div class="inline-flex bg-slate-100 p-1 rounded-xl">
-                        <button type="button" id="btnTypeExpense" onclick="setRecordType('expense')" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-rose-500 text-white shadow-xs transition">支出</button>
-                        <button type="button" id="btnTypeIncome" onclick="setRecordType('income')" class="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600 transition">收入</button>
-                    </div>
-                    <button onclick="closeRecordModal()" class="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">
-                        <i data-lucide="x" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <form id="recordForm" onsubmit="handleSaveRecord(event)" class="space-y-4">
-                    <!-- 金额输入 -->
-                    <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 focus-within:border-brand-500 focus-within:bg-white transition">
-                        <label class="block text-[11px] font-medium text-slate-400 mb-1">金额 (CNY)</label>
-                        <div class="flex items-baseline gap-1">
-                            <span class="text-2xl font-bold text-slate-400">¥</span>
-                            <input type="number" id="inputAmount" step="0.01" min="0.01" required placeholder="0.00" class="w-full text-3xl font-bold text-slate-900 bg-transparent focus:outline-none tabular-nums">
-                        </div>
-                    </div>
-
-                    <!-- 分类网格 -->
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-2">选择分类</label>
-                        <div id="categoryGrid" class="grid grid-cols-4 gap-2.5">
-                            <!-- 动态渲染分类按钮 -->
-                        </div>
-                    </div>
-
-                    <!-- 日期与备注 -->
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[11px] font-medium text-slate-500 mb-1">日期</label>
-                            <input type="date" id="inputDate" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-brand-500">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-medium text-slate-500 mb-1">备注 (选填)</label>
-                            <input type="text" id="inputNote" maxlength="30" placeholder="写点什么..." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-brand-500">
-                        </div>
-                    </div>
-
-                    <button type="submit" id="btnSubmitRecord" class="w-full py-3.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition active:scale-[0.98]">
-                        保存账单
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- ==================== 弹窗 2：周期与预算设置面板 ==================== -->
-        <div id="settingsModal" class="hidden fixed sm:absolute inset-0 z-40 flex flex-col justify-end">
-            <div onclick="closeSettingsModal()" class="modal-backdrop fixed sm:absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"></div>
-            <div class="modal-panel relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl z-10 max-h-[90%] overflow-y-auto no-scrollbar">
-                <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-base font-bold text-slate-900">自定义周期与预算</h3>
-                    <button onclick="closeSettingsModal()" class="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">
-                        <i data-lucide="x" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <form onsubmit="handleSaveSettings(event)" class="space-y-4">
-                    <!-- 每月起始日 -->
-                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="text-xs font-bold text-slate-800">每月周期起始日 (发薪/生活费日)</label>
-                            <span id="previewStartDay" class="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md">每月 15 日</span>
-                        </div>
-                        <input type="range" id="settingStartDay" min="1" max="28" value="15" oninput="updateSettingPreview()" class="w-full accent-brand-600 cursor-pointer">
-                        <div class="flex justify-between text-[10px] text-slate-400 mt-1">
-                            <span>1号 (自然月)</span>
-                            <span>10号</span>
-                            <span>15号</span>
-                            <span>20号</span>
-                            <span>28号</span>
-                        </div>
-                        <p id="previewCycleExample" class="text-[11px] text-slate-500 mt-2.5 bg-white p-2.5 rounded-xl border border-slate-100">
-                            示例：若设为每月 15 日，则记账周期为 <strong class="text-slate-700">本月15日 至 次月14日</strong>。
-                        </p>
-                    </div>
-
-                    <!-- 每周期总预算 -->
-                    <div>
-                        <label class="block text-xs font-bold text-slate-800 mb-1.5">单周期总预算 (元)</label>
-                        <div class="relative">
-                            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">¥</span>
-                            <input type="number" id="settingBudget" min="0" step="100" required class="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-brand-500">
-                        </div>
-                    </div>
-
-                    <button type="submit" class="w-full py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-md transition active:scale-[0.98]">
-                        保存设置
-                    </button>
-                </form>
-
-                <!-- 数据管理区 (重置演示数据 / 清空) -->
-                <div class="mt-6 pt-4 border-t border-slate-100">
-                    <div class="text-[11px] font-semibold text-slate-400 mb-2.5">数据管理 (本地存储)</div>
-                    <div class="grid grid-cols-2 gap-2.5">
-                        <button type="button" onclick="confirmAction('resetDemo')" class="py-2.5 px-3 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-semibold transition flex items-center justify-center gap-1.5">
-                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                            <span>恢复演示数据</span>
-                        </button>
-                        <button type="button" onclick="confirmAction('clearAll')" class="py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition flex items-center justify-center gap-1.5">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                            <span>清空所有账单</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ==================== 弹窗 3：自定义确认框 (替代 confirm) ==================== -->
-        <div id="confirmModal" class="hidden fixed sm:absolute inset-0 z-50 flex items-center justify-center p-6">
-            <div onclick="closeConfirmModal()" class="fixed sm:absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"></div>
-            <div class="relative bg-white rounded-3xl p-5 w-full max-w-[300px] shadow-2xl z-10 text-center">
-                <div class="w-11 h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
-                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
-                </div>
-                <h4 id="confirmTitle" class="text-sm font-bold text-slate-900 mb-1">确认操作？</h4>
-                <p id="confirmDesc" class="text-xs text-slate-500 mb-5 leading-relaxed">此操作将更新您的本地账单记录。</p>
-                <div class="grid grid-cols-2 gap-2.5">
-                    <button onclick="closeConfirmModal()" class="py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">取消</button>
-                    <button id="btnConfirmYes" class="py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition">确定</button>
-                </div>
-            </div>
-        </div>
-
+<body>
+  <div class="container">
+    <!-- 顶部栏 -->
+    <div class="header">
+      <h1>周期记 <span class="badge" id="cycleBadge">每月15日结转</span></h1>
+      <button class="icon-btn" onclick="openSettings()">⚙️ 周期与备份</button>
     </div>
 
-    <script>
-        // ==================== 1. 常量与分类配置 ====================
-        const STORAGE_KEY_SETTINGS = 'cycle_ledger_settings_v1';
-        const STORAGE_KEY_RECORDS = 'cycle_ledger_records_v1';
+    <!-- 周期切换 -->
+    <div class="cycle-bar">
+      <button class="cycle-nav-btn" onclick="shiftCycle(-1)">‹</button>
+      <div class="cycle-info">
+        <div class="cycle-dates">
+          <span id="cycleRangeText"></span>
+          <button class="reset-cycle-btn" id="resetCycleBtn" style="display:none;" onclick="resetCycleOffset()">回本期</button>
+        </div>
+        <div class="cycle-sub" id="daysLeftText"></div>
+      </div>
+      <button class="cycle-nav-btn" onclick="shiftCycle(1)">›</button>
+    </div>
 
-        const CATEGORIES = {
-            expense: [
-                { id: 'food', name: '餐饮美食', icon: 'utensils', color: '#f97316', bg: 'bg-orange-50 text-orange-600' },
-                { id: 'transport', name: '交通出行', icon: 'bus', color: '#3b82f6', bg: 'bg-blue-50 text-blue-600' },
-                { id: 'shopping', name: '购物消费', icon: 'shopping-bag', color: '#ec4899', bg: 'bg-pink-50 text-pink-600' },
-                { id: 'entertainment', name: '休闲娱乐', icon: 'gamepad-2', color: '#8b5cf6', bg: 'bg-purple-50 text-purple-600' },
-                { id: 'housing', name: '房租水电', icon: 'home', color: '#14b8a6', bg: 'bg-teal-50 text-teal-600' },
-                { id: 'medical', name: '医疗健康', icon: 'heart-pulse', color: '#ef4444', bg: 'bg-red-50 text-red-600' },
-                { id: 'study', name: '学习提升', icon: 'book-open', color: '#6366f1', bg: 'bg-indigo-50 text-indigo-600' },
-                { id: 'other_exp', name: '其他支出', icon: 'more-horizontal', color: '#64748b', bg: 'bg-slate-100 text-slate-600' }
-            ],
-            income: [
-                { id: 'salary', name: '工资薪水', icon: 'briefcase', color: '#10b981', bg: 'bg-emerald-50 text-emerald-600' },
-                { id: 'allowance', name: '生活费', icon: 'wallet', color: '#06b6d4', bg: 'bg-cyan-50 text-cyan-600' },
-                { id: 'parttime', name: '兼职副业', icon: 'sparkles', color: '#f59e0b', bg: 'bg-amber-50 text-amber-600' },
-                { id: 'bonus', name: '奖金红包', icon: 'gift', color: '#ec4899', bg: 'bg-pink-50 text-pink-600' },
-                { id: 'invest', name: '理财收益', icon: 'trending-up', color: '#6366f1', bg: 'bg-indigo-50 text-indigo-600' },
-                { id: 'other_inc', name: '其他收入', icon: 'plus-circle', color: '#64748b', bg: 'bg-slate-100 text-slate-600' }
-            ]
-        };
+    <!-- 核心概览卡片 -->
+    <div class="summary-card">
+      <div class="summary-top">
+        <div>
+          <div class="summary-label">本周期剩余可用预算</div>
+          <div class="summary-amount" id="remainBudgetText">¥0.00</div>
+        </div>
+        <div class="daily-tag">
+          <div>日均可用</div>
+          <strong id="dailyAvgText">¥0.00</strong>
+        </div>
+      </div>
+      <div class="progress-bg">
+        <div class="progress-fill" id="budgetProgress" style="width: 0%;"></div>
+      </div>
+      <div class="summary-bottom">
+        <span>周期支出: <strong id="totalExpenseText">¥0.00</strong></span>
+        <span>周期收入: <strong id="totalIncomeText">¥0.00</strong></span>
+        <span>总预算: <strong id="totalBudgetText">¥0</strong></span>
+      </div>
+    </div>
 
-        // ==================== 2. 全局应用状态 ====================
-        let state = {
-            settings: {
-                startDay: 15, // 默认每月15号发薪/发生活费
-                budget: 4000
-            },
-            records: [],
-            cycleOffset: 0, // 0 代表当前周期，-1 代表上一周期，+1 代表下一周期
-            currentView: 'transactions', // 'transactions' | 'stats'
-            statType: 'expense', // 'expense' | 'income'
-            recordFormType: 'expense',
-            selectedCategory: 'food'
-        };
+    <!-- 视图切换 -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tabRecords" onclick="switchTab('records')">账单明细</button>
+      <button class="tab-btn" id="tabStats" onclick="switchTab('stats')">周期统计</button>
+    </div>
 
-        // ==================== 3. 日期与自定义周期核心算法 ====================
-        
-        /**
-         * 格式化日期为 YYYY-MM-DD (本地时区)
-         */
-        function formatDateISO(date) {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        }
+    <!-- 明细视图 -->
+    <div id="recordsView">
+      <div class="filter-bar">
+        <input type="text" id="searchInput" placeholder="搜索备注或分类..." oninput="render()" />
+        <select id="typeFilter" onchange="render()">
+          <option value="all">全部收支</option>
+          <option value="expense">仅看支出</option>
+          <option value="income">仅看收入</option>
+        </select>
+      </div>
+      <div class="record-list" id="recordList"></div>
+    </div>
 
-        /**
-         * 解析 YYYY-MM-DD 字符串为本地 Date 对象 (00:00:00)
-         */
-        function parseDateISO(dateStr) {
-            const [y, m, d] = dateStr.split('-').map(Number);
-            return new Date(y, m - 1, d, 0, 0, 0, 0);
-        }
+    <!-- 统计视图 -->
+    <div id="statsView" style="display:none;">
+      <div class="stats-card" id="statsContainer"></div>
+    </div>
+  </div>
 
-        /**
-         * 获取某年某月的总天数
-         */
-        function getDaysInMonth(year, monthIndex) {
-            return new Date(year, monthIndex + 1, 0).getDate();
-        }
+  <!-- 悬浮记一笔按钮（固定在屏幕右下角） -->
+  <button class="fab-add" onclick="openAddModal()">
+    <span style="font-size:20px;line-height:1;">+</span> 记一笔
+  </button>
 
-        /**
-         * 核心算法：根据基准日期、每月起始日(1-28)以及周期偏移量，计算周期起止日期
-         * 例如：今天11月23日，startDay=15，offset=0 -> 11月15日 ~ 12月14日
-         * 例如：今天11月10日，startDay=15，offset=0 -> 10月15日 ~ 11月14日
-         */
-        function getCycleBounds(startDay, offset = 0) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+  <!-- 记一笔弹窗 -->
+  <div class="modal-mask" id="addModal" onclick="closeModalOnMask(event, 'addModal')">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span class="modal-title">记一笔</span>
+        <button class="close-btn" onclick="closeModal('addModal')">✕</button>
+      </div>
 
-            let baseYear = today.getFullYear();
-            let baseMonth = today.getMonth();
+      <div class="type-switch">
+        <button class="type-btn active" id="btnExpense" onclick="setRecordType('expense')">支出</button>
+        <button class="type-btn" id="btnIncome" onclick="setRecordType('income')">收入</button>
+      </div>
 
-            // 如果今天还没到本月的起始日，说明当前属于上个月起始日开始的周期
-            if (today.getDate() < startDay) {
-                baseMonth -= 1;
-            }
+      <div class="cat-grid" id="catGrid"></div>
 
-            // 加上用户的周期切换偏移量
-            const targetStartMonth = baseMonth + offset;
-            const startDate = new Date(baseYear, targetStartMonth, startDay, 0, 0, 0, 0);
+      <div class="form-group">
+        <label>金额 (元)</label>
+        <input type="number" id="amountInput" step="0.01" placeholder="0.00" inputmode="decimal" />
+      </div>
 
-            // 结束日期为下个周期起始日的前一天
-            let endDate;
-            if (startDay === 1) {
-                // 自然月：当月最后一天
-                endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
-            } else {
-                // 跨月周期：下个月的 (startDay - 1) 号
-                endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, startDay - 1, 23, 59, 59, 999);
-            }
+      <div class="form-group">
+        <label>日期</label>
+        <input type="date" id="dateInput" />
+      </div>
 
-            // 下一个发薪日（用于计算倒计时）
-            const nextPayday = new Date(startDate.getFullYear(), startDate.getMonth() + 1, startDay, 0, 0, 0, 0);
+      <div class="form-group">
+        <label>备注 (选填)</label>
+        <input type="text" id="noteInput" placeholder="例如：午餐、买书、生活费..." />
+      </div>
 
-            return {
-                startDate,
-                endDate,
-                nextPayday,
-                startStr: formatDateISO(startDate),
-                endStr: formatDateISO(endDate)
+      <button class="submit-btn" onclick="saveRecord()">保存记录</button>
+    </div>
+  </div>
+
+  <!-- 周期与数据备份弹窗 -->
+  <div class="modal-mask" id="settingsModal" onclick="closeModalOnMask(event, 'settingsModal')">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span class="modal-title">周期设置与数据备份</span>
+        <button class="close-btn" onclick="closeModal('settingsModal')">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label>每月记账起始日 (发薪日 / 生活费发放日)：<strong id="startDayLabel" style="color:var(--primary);">15号</strong></label>
+        <input type="range" id="startDayInput" min="1" max="28" value="15" oninput="document.getElementById('startDayLabel').innerText = this.value + '号'" />
+      </div>
+
+      <div class="form-group">
+        <label>单周期总预算 (元)</label>
+        <input type="number" id="budgetInput" placeholder="3000" inputmode="decimal" />
+      </div>
+
+      <button class="submit-btn" onclick="saveSettings()">保存周期设置</button>
+
+      <div class="backup-actions">
+        <button class="secondary-btn" onclick="exportData()">📤 导出备份 (JSON)</button>
+        <button class="secondary-btn" onclick="document.getElementById('importFile').click()">📥 导入恢复</button>
+        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)" />
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CATEGORIES = {
+      expense: [
+        { name: '餐饮', icon: '🍜' },
+        { name: '交通', icon: '🚇' },
+        { name: '购物', icon: '🛍️' },
+        { name: '娱乐', icon: '🎮' },
+        { name: '学习', icon: '📚' },
+        { name: '居住', icon: '🏠' },
+        { name: '医疗', icon: '💊' },
+        { name: '其他', icon: '📦' }
+      ],
+      income: [
+        { name: '工资', icon: '💰' },
+        { name: '生活费', icon: '🧧' },
+        { name: '兼职', icon: '💼' },
+        { name: '理财', icon: '📈' },
+        { name: '红包', icon: '🎁' },
+        { name: '其他', icon: '✨' }
+      ]
+    };
+
+    let state = {
+      startDay: 15,
+      budget: 3000,
+      records: []
+    };
+
+    let cycleOffset = 0;
+    let currentTab = 'records';
+    let currentRecordType = 'expense';
+    let selectedCategory = '餐饮';
+
+    function loadState() {
+      const saved = localStorage.getItem('cycle_ledger_data_v1');
+      if (saved) {
+        try {
+          state = JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem('cycle_ledger_data_v1', JSON.stringify(state));
+    }
+
+    function formatDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function getCycleRange(offset = 0) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const sd = state.startDay;
+
+      let baseYear = today.getFullYear();
+      let baseMonth = today.getMonth();
+      if (today.getDate() < sd) {
+        baseMonth -= 1;
+      }
+
+      const start = new Date(baseYear, baseMonth + offset, sd);
+      const nextStart = new Date(baseYear, baseMonth + offset + 1, sd);
+      const end = new Date(nextStart.getTime() - 86400000);
+
+      return { start, end, nextStart, today };
+    }
+
+    function shiftCycle(delta) {
+      cycleOffset += delta;
+      render();
+    }
+
+    function resetCycleOffset() {
+      cycleOffset = 0;
+      render();
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('tabRecords').classList.toggle('active', tab === 'records');
+      document.getElementById('tabStats').classList.toggle('active', tab === 'stats');
+      document.getElementById('recordsView').style.display = tab === 'records' ? 'block' : 'none';
+      document.getElementById('statsView').style.display = tab === 'stats' ? 'block' : 'none';
+      render();
+    }
+
+    function render() {
+      const { start, end, nextStart, today } = getCycleRange(cycleOffset);
+      const startStr = formatDate(start);
+      const endStr = formatDate(end);
+
+      document.getElementById('cycleBadge').innerText = `每月${state.startDay}日结转`;
+      document.getElementById('cycleRangeText').innerText = `${start.getMonth() + 1}月${start.getDate()}日 - ${end.getMonth() + 1}月${end.getDate()}日`;
+      document.getElementById('resetCycleBtn').style.display = cycleOffset !== 0 ? 'inline-block' : 'none';
+
+      let daysLeft = 1;
+      if (cycleOffset === 0) {
+        daysLeft = Math.max(1, Math.ceil((nextStart - today) / 86400000));
+        document.getElementById('daysLeftText').innerText = `距下次结转还有 ${daysLeft} 天`;
+      } else if (cycleOffset < 0) {
+        document.getElementById('daysLeftText').innerText = `历史周期（已结束）`;
+      } else {
+        daysLeft = Math.max(1, Math.ceil((nextStart - start) / 86400000));
+        document.getElementById('daysLeftText').innerText = `未来周期（共 ${daysLeft} 天）`;
+      }
+
+      const cycleRecords = state.records.filter(r => r.date >= startStr && r.date <= endStr);
+      const totalExpense = cycleRecords.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+      const totalIncome = cycleRecords.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+
+      const remainBudget = state.budget - totalExpense;
+      const dailyAvg = remainBudget > 0 ? (remainBudget / daysLeft) : 0;
+      const pct = state.budget > 0 ? Math.min(100, Math.max(0, (totalExpense / state.budget) * 100)) : 0;
+
+      document.getElementById('remainBudgetText').innerText = `¥${remainBudget.toFixed(2)}`;
+      document.getElementById('dailyAvgText').innerText = `¥${dailyAvg.toFixed(2)}`;
+      document.getElementById('budgetProgress').style.width = `${pct}%`;
+      document.getElementById('totalExpenseText').innerText = `¥${totalExpense.toFixed(2)}`;
+      document.getElementById('totalIncomeText').innerText = `¥${totalIncome.toFixed(2)}`;
+      document.getElementById('totalBudgetText').innerText = `¥${state.budget}`;
+
+      if (currentTab === 'records') {
+        renderRecords(cycleRecords);
+      } else {
+        renderStats(cycleRecords, totalExpense);
+      }
+    }
+
+    function renderRecords(cycleRecords) {
+      const kw = document.getElementById('searchInput').value.trim().toLowerCase();
+      const tf = document.getElementById('typeFilter').value;
+
+      const filtered = cycleRecords
+        .filter(r => tf === 'all' || r.type === tf)
+        .filter(r => !kw || r.category.toLowerCase().includes(kw) || (r.note && r.note.toLowerCase().includes(kw)))
+        .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+
+      const listEl = document.getElementById('recordList');
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="empty-tip">当前周期暂无符合条件的账单<br>点击右下角「+ 记一笔」开始记录</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(r => {
+        const catObj = [...CATEGORIES.expense, ...CATEGORIES.income].find(c => c.name === r.category) || { icon: '📝' };
+        const sign = r.type === 'expense' ? '-' : '+';
+        return `
+          <div class="record-item">
+            <div class="record-left">
+              <div class="cat-icon">${catObj.icon}</div>
+              <div>
+                <div class="record-title">${r.category} ${r.note ? `· <span style="font-weight:400;font-size:13px;color:var(--text-sub);">${escapeHtml(r.note)}</span>` : ''}</div>
+                <div class="record-meta">${r.date}</div>
+              </div>
+            </div>
+            <div class="record-right">
+              <div class="record-amount ${r.type}">${sign}¥${r.amount.toFixed(2)}</div>
+              <button class="del-btn" onclick="deleteRecord(${r.id})" title="删除">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderStats(cycleRecords, totalExpense) {
+      const container = document.getElementById('statsContainer');
+      const expenses = cycleRecords.filter(r => r.type === 'expense');
+      if (expenses.length === 0) {
+        container.innerHTML = `<div class="empty-tip">本周期暂无支出数据可统计</div>`;
+        return;
+      }
+
+      const map = {};
+      expenses.forEach(r => {
+        map[r.category] = (map[r.category] || 0) + r.amount;
+      });
+
+      const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
+      container.innerHTML = `<div style="font-weight:700;margin-bottom:14px;font-size:15px;">支出分类占比 (共 ¥${totalExpense.toFixed(2)})</div>` +
+        sorted.map(([cat, amt]) => {
+          const pct = totalExpense > 0 ? ((amt / totalExpense) * 100).toFixed(1) : 0;
+          const catObj = CATEGORIES.expense.find(c => c.name === cat) || { icon: '📦' };
+          return `
+            <div class="stat-row">
+              <div class="stat-row-top">
+                <span>${catObj.icon} ${cat} (${pct}%)</span>
+                <strong>¥${amt.toFixed(2)}</strong>
+              </div>
+              <div class="stat-bar-bg">
+                <div class="stat-bar-fill" style="width:${pct}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    function openAddModal() {
+      document.getElementById('dateInput').value = formatDate(new Date());
+      document.getElementById('amountInput').value = '';
+      document.getElementById('noteInput').value = '';
+      setRecordType('expense');
+      document.getElementById('addModal').classList.add('show');
+    }
+
+    function setRecordType(type) {
+      currentRecordType = type;
+      document.getElementById('btnExpense').classList.toggle('active', type === 'expense');
+      document.getElementById('btnIncome').classList.toggle('active', type === 'income');
+      selectedCategory = CATEGORIES[type][0].name;
+      renderCategoryGrid();
+    }
+
+    function renderCategoryGrid() {
+      const grid = document.getElementById('catGrid');
+      grid.innerHTML = CATEGORIES[currentRecordType].map(c => `
+        <div class="cat-chip ${c.name === selectedCategory ? 'active' : ''}" onclick="selectCategory('${c.name}')">
+          <div style="font-size:18px;margin-bottom:2px;">${c.icon}</div>
+          <div>${c.name}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectCategory(name) {
+      selectedCategory = name;
+      renderCategoryGrid();
+    }
+
+    function saveRecord() {
+      const amount = parseFloat(document.getElementById('amountInput').value);
+      const date = document.getElementById('dateInput').value;
+      const note = document.getElementById('noteInput').value.trim();
+
+      if (!amount || amount <= 0) {
+        alert('请输入有效金额');
+        return;
+      }
+      if (!date) {
+        alert('请选择日期');
+        return;
+      }
+
+      state.records.push({
+        id: Date.now(),
+        type: currentRecordType,
+        category: selectedCategory,
+        amount,
+        date,
+        note
+      });
+
+      saveState();
+      closeModal('addModal');
+      render();
+    }
+
+    function deleteRecord(id) {
+      if (!confirm('确定删除这条记录吗？')) return;
+      state.records = state.records.filter(r => r.id !== id);
+      saveState();
+      render();
+    }
+
+    function openSettings() {
+      document.getElementById('startDayInput').value = state.startDay;
+      document.getElementById('startDayLabel').innerText = `${state.startDay}号`;
+      document.getElementById('budgetInput').value = state.budget;
+      document.getElementById('settingsModal').classList.add('show');
+    }
+
+    function saveSettings() {
+      const sd = parseInt(document.getElementById('startDayInput').value, 10);
+      const bg = parseFloat(document.getElementById('budgetInput').value) || 0;
+      state.startDay = Math.min(28, Math.max(1, sd));
+      state.budget = bg;
+      cycleOffset = 0;
+      saveState();
+      closeModal('settingsModal');
+      render();
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cycle-ledger-backup-${formatDate(new Date())}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (Array.isArray(parsed.records)) {
+            state = {
+              startDay: parsed.startDay || 15,
+              budget: parsed.budget || 3000,
+              records: parsed.records
             };
+            saveState();
+            closeModal('settingsModal');
+            render();
+            alert('数据恢复成功！');
+          } else {
+            alert('备份文件格式不正确');
+          }
+        } catch (err) {
+          alert('无法解析该备份文件');
         }
-
-        // ==================== 4. 数据持久化与演示数据生成 ====================
-
-        function generateDemoRecords(startDay) {
-            const { startDate } = getCycleBounds(startDay, 0);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            // 辅助函数：在周期起始日基础上增加天数，且不超过今天（如果起始日已过）
-            const getSafeDateStr = (daysAfterStart) => {
-                const d = new Date(startDate);
-                d.setDate(d.getDate() + daysAfterStart);
-                if (d > today && startDate <= today) {
-                    return formatDateISO(today);
-                }
-                return formatDateISO(d);
-            };
-
-            const cycleStartStr = formatDateISO(startDate);
-
-            return [
-                {
-                    id: 'demo_1',
-                    type: 'income',
-                    category: 'salary',
-                    amount: 6500.00,
-                    date: cycleStartStr,
-                    note: '本月薪资/生活费到账'
-                },
-                {
-                    id: 'demo_2',
-                    type: 'expense',
-                    category: 'housing',
-                    amount: 1200.00,
-                    date: cycleStartStr,
-                    note: '本月房租与宽带分摊'
-                },
-                {
-                    id: 'demo_3',
-                    type: 'expense',
-                    category: 'food',
-                    amount: 42.50,
-                    date: getSafeDateStr(1),
-                    note: '午餐轻食沙拉与咖啡'
-                },
-                {
-                    id: 'demo_4',
-                    type: 'expense',
-                    category: 'transport',
-                    amount: 18.00,
-                    date: getSafeDateStr(2),
-                    note: '地铁通勤周卡充值'
-                },
-                {
-                    id: 'demo_5',
-                    type: 'expense',
-                    category: 'shopping',
-                    amount: 168.00,
-                    date: getSafeDateStr(4),
-                    note: '日用品与秋冬季护肤'
-                },
-                {
-                    id: 'demo_6',
-                    type: 'expense',
-                    category: 'food',
-                    amount: 86.00,
-                    date: formatDateISO(today),
-                    note: '下班和朋友聚餐火锅'
-                },
-                {
-                    id: 'demo_7',
-                    type: 'expense',
-                    category: 'entertainment',
-                    amount: 35.50,
-                    date: formatDateISO(today),
-                    note: '周末电影票'
-                }
-            ];
-        }
-
-        function loadData() {
-            try {
-                const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
-                const savedRecords = localStorage.getItem(STORAGE_KEY_RECORDS);
-
-                if (savedSettings) {
-                    state.settings = JSON.parse(savedSettings);
-                }
-
-                if (savedRecords !== null) {
-                    state.records = JSON.parse(savedRecords);
-                } else {
-                    // 初次打开，注入贴合当前自定义周期的演示数据
-                    state.records = generateDemoRecords(state.settings.startDay);
-                    saveData();
-                }
-            } catch (e) {
-                console.error('读取本地存储失败:', e);
-                state.records = generateDemoRecords(15);
-            }
-        }
-
-        function saveData() {
-            try {
-                localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(state.settings));
-                localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(state.records));
-            } catch (e) {
-                showToast('本地存储空间不足，保存失败');
-            }
-        }
-
-        // ==================== 5. UI 渲染与更新逻辑 ====================
-
-        function formatMoney(num) {
-            return '¥' + Number(num).toLocaleString('zh-CN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
-
-        function getCategoryInfo(type, catId) {
-            const list = CATEGORIES[type] || CATEGORIES.expense;
-            return list.find(c => c.id === catId) || list[list.length - 1];
-        }
-
-        /**
-         * 主刷新函数：更新仪表盘、周期信息、账单明细与统计图表
-         */
-        function refreshUI() {
-            const { startDay, budget } = state.settings;
-            const bounds = getCycleBounds(startDay, state.cycleOffset);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            // 1. 更新顶部规则标签与周期日期展示
-            document.getElementById('headerRuleTag').textContent = `每月 ${startDay} 日起算`;
-            
-            const startLabel = `${bounds.startDate.getMonth() + 1}月${bounds.startDate.getDate()}日`;
-            const endLabel = `${bounds.endDate.getMonth() + 1}月${bounds.endDate.getDate()}日`;
-            // 若跨年则显示年份
-            const yearPrefix = bounds.startDate.getFullYear() !== today.getFullYear() ? `${bounds.startDate.getFullYear()}年 ` : '';
-            document.getElementById('cycleRangeText').textContent = `${yearPrefix}${startLabel} - ${endLabel}`;
-
-            // 状态徽章与“回本期”按钮
-            const badgeEl = document.getElementById('cycleStatusBadge');
-            const resetBtn = document.getElementById('btnResetCycle');
-            const countdownEl = document.getElementById('cycleCountdownText');
-
-            if (state.cycleOffset === 0) {
-                badgeEl.textContent = '当前周期';
-                badgeEl.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-brand-100 text-brand-700';
-                resetBtn.classList.add('hidden');
-
-                const diffTime = bounds.nextPayday.getTime() - today.getTime();
-                const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-                countdownEl.innerHTML = `距离下个起始日 (${startDay}号) 还有 <span class="font-bold text-brand-600">${daysLeft}</span> 天`;
-            } else if (state.cycleOffset < 0) {
-                badgeEl.textContent = '历史周期';
-                badgeEl.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-600';
-                resetBtn.classList.remove('hidden');
-                countdownEl.textContent = `已归档的历史账单周期`;
-            } else {
-                badgeEl.textContent = '未来周期';
-                badgeEl.className = 'text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700';
-                resetBtn.classList.remove('hidden');
-                countdownEl.textContent = `尚未开始的未来规划周期`;
-            }
-
-            // 2. 筛选当前周期内的所有账单
-            const cycleRecords = state.records.filter(r => r.date >= bounds.startStr && r.date <= bounds.endStr);
-
-            let totalExpense = 0;
-            let totalIncome = 0;
-            cycleRecords.forEach(r => {
-                if (r.type === 'expense') totalExpense += Number(r.amount);
-                else totalIncome += Number(r.amount);
-            });
-
-            // 3. 更新仪表盘数值与进度条
-            const remainingBudget = budget - totalExpense;
-            const percentUsed = budget > 0 ? Math.min(100, Math.round((totalExpense / budget) * 100)) : 0;
-
-            const remEl = document.getElementById('dashRemainingBudget');
-            remEl.textContent = (remainingBudget < 0 ? '-' : '') + formatMoney(Math.abs(remainingBudget));
-            remEl.className = `text-3xl font-bold tracking-tight tabular-nums ${remainingBudget < 0 ? 'text-rose-400' : 'text-white'}`;
-
-            document.getElementById('dashTotalBudget').textContent = formatMoney(budget);
-            document.getElementById('dashTotalExpense').textContent = formatMoney(totalExpense);
-            document.getElementById('dashTotalIncome').textContent = formatMoney(totalIncome);
-            document.getElementById('dashBudgetPercent').textContent = `${budget > 0 ? Math.round((totalExpense / budget) * 100) : 0}%`;
-
-            const progressBar = document.getElementById('dashProgressBar');
-            progressBar.style.width = `${percentUsed}%`;
-            if (remainingBudget < 0) {
-                progressBar.className = 'h-full rounded-full bg-gradient-to-r from-rose-500 to-red-400 transition-all duration-500';
-            } else if (percentUsed > 80) {
-                progressBar.className = 'h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-500';
-            } else {
-                progressBar.className = 'h-full rounded-full bg-gradient-to-r from-brand-400 to-emerald-300 transition-all duration-500';
-            }
-
-            // 计算日均可用额度
-            const dailyLabelEl = document.getElementById('dailyAllowanceLabel');
-            const dailyValEl = document.getElementById('dashDailyAllowance');
-            if (state.cycleOffset === 0) {
-                const diffTime = bounds.nextPayday.getTime() - today.getTime();
-                const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-                dailyLabelEl.textContent = `剩余${daysLeft}天日均可用`;
-                const dailyAvg = remainingBudget > 0 ? (remainingBudget / daysLeft) : 0;
-                dailyValEl.textContent = formatMoney(dailyAvg);
-                dailyValEl.className = `text-sm font-bold tabular-nums mt-0.5 ${remainingBudget < 0 ? 'text-rose-400' : 'text-brand-400'}`;
-            } else {
-                const totalDays = Math.round((bounds.endDate - bounds.startDate) / (1000 * 60 * 60 * 24));
-                dailyLabelEl.textContent = '周期日均支出';
-                dailyValEl.textContent = formatMoney(totalExpense / Math.max(1, totalDays));
-                dailyValEl.className = 'text-sm font-bold tabular-nums mt-0.5 text-slate-200';
-            }
-
-            // 4. 渲染明细列表 & 统计图
-            renderTransactions(cycleRecords);
-            renderStats(cycleRecords);
-            lucide.createIcons();
-        }
-
-        /**
-         * 渲染按日分组的账单明细
-         */
-        function renderTransactions(preFilteredRecords = null) {
-            const { startDay } = state.settings;
-            const bounds = getCycleBounds(startDay, state.cycleOffset);
-            let records = preFilteredRecords || state.records.filter(r => r.date >= bounds.startStr && r.date <= bounds.endStr);
-
-            // 应用搜索与类型筛选
-            const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-            const typeFilter = document.getElementById('filterTypeSelect').value;
-
-            records = records.filter(r => {
-                if (typeFilter !== 'all' && r.type !== typeFilter) return false;
-                if (keyword) {
-                    const cat = getCategoryInfo(r.type, r.category);
-                    const matchNote = (r.note || '').toLowerCase().includes(keyword);
-                    const matchCat = cat.name.toLowerCase().includes(keyword);
-                    return matchNote || matchCat;
-                }
-                return true;
-            });
-
-            // 按日期倒序排列，同日按添加顺序倒序
-            records.sort((a, b) => b.date.localeCompare(a.date));
-
-            const container = document.getElementById('transactionListContainer');
-            if (records.length === 0) {
-                container.innerHTML = `
-                    <div class="bg-white rounded-3xl p-8 text-center border border-slate-100 shadow-soft">
-                        <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto mb-3">
-                            <i data-lucide="receipt" class="w-6 h-6"></i>
-                        </div>
-                        <p class="text-sm font-semibold text-slate-700">本周期暂无符合条件的账单</p>
-                        <p class="text-xs text-slate-400 mt-1">点击下方“记一笔”开始记录你的周期收支吧</p>
-                    </div>
-                `;
-                lucide.createIcons();
-                return;
-            }
-
-            // 按日期分组
-            const groups = {};
-            records.forEach(r => {
-                if (!groups[r.date]) groups[r.date] = [];
-                groups[r.date].push(r);
-            });
-
-            const todayStr = formatDateISO(new Date());
-            const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-
-            let html = '';
-            Object.keys(groups).sort((a, b) => b.localeCompare(a)).forEach(dateStr => {
-                const dayItems = groups[dateStr];
-                const dObj = parseDateISO(dateStr);
-                const dayLabel = dateStr === todayStr ? '今天' : `${dObj.getMonth() + 1}月${dObj.getDate()}日 ${weekDays[dObj.getDay()]}`;
-
-                let dayExp = 0, dayInc = 0;
-                dayItems.forEach(i => {
-                    if (i.type === 'expense') dayExp += Number(i.amount);
-                    else dayInc += Number(i.amount);
-                });
-
-                html += `
-                    <div class="bg-white rounded-3xl p-4 shadow-soft border border-slate-100/80">
-                        <div class="flex justify-between items-center pb-2.5 mb-2.5 border-b border-slate-100 text-[11px] text-slate-400 font-medium">
-                            <span class="text-slate-600 font-semibold">${dayLabel}</span>
-                            <div class="flex gap-2.5 tabular-nums">
-                                ${dayInc > 0 ? `<span class="text-emerald-600">收 +${dayInc.toFixed(2)}</span>` : ''}
-                                ${dayExp > 0 ? `<span>支 -${dayExp.toFixed(2)}</span>` : ''}
-                            </div>
-                        </div>
-                        <div class="space-y-3">
-                `;
-
-                dayItems.forEach(item => {
-                    const cat = getCategoryInfo(item.type, item.category);
-                    const isExpense = item.type === 'expense';
-                    html += `
-                        <div class="group flex items-center justify-between gap-3">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="w-10 h-10 rounded-2xl ${cat.bg} flex items-center justify-center shrink-0">
-                                    <i data-lucide="${cat.icon}" class="w-4 h-4"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="text-xs font-bold text-slate-800 truncate">${cat.name}</div>
-                                    <div class="text-[11px] text-slate-400 truncate mt-0.5">${item.note || '无备注'}</div>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2.5 shrink-0">
-                                <span class="text-sm font-bold tabular-nums ${isExpense ? 'text-slate-900' : 'text-emerald-600'}">
-                                    ${isExpense ? '-' : '+'}${Number(item.amount).toFixed(2)}
-                                </span>
-                                <button onclick="deleteRecord('${item.id}')" class="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition" title="删除记录">
-                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                html += `</div></div>`;
-            });
-
-            container.innerHTML = html;
-            lucide.createIcons();
-        }
-
-        /**
-         * 渲染周期数据可视化统计（SVG环形图 + 占比条）
-         */
-        function renderStats(preFilteredRecords = null) {
-            const { startDay, budget } = state.settings;
-            const bounds = getCycleBounds(startDay, state.cycleOffset);
-            const records = preFilteredRecords || state.records.filter(r => r.date >= bounds.startStr && r.date <= bounds.endStr);
-
-            const targetRecords = records.filter(r => r.type === state.statType);
-            const total = targetRecords.reduce((sum, r) => sum + Number(r.amount), 0);
-
-            const chartContainer = document.getElementById('chartContainer');
-            const listContainer = document.getElementById('categoryBreakdownList');
-
-            if (targetRecords.length === 0 || total === 0) {
-                chartContainer.innerHTML = `
-                    <div class="py-8 text-center">
-                        <div class="w-12 h-12 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center mx-auto mb-2">
-                            <i data-lucide="pie-chart" class="w-6 h-6"></i>
-                        </div>
-                        <p class="text-xs text-slate-400">本周期暂无${state.statType === 'expense' ? '支出' : '收入'}数据</p>
-                    </div>
-                `;
-                listContainer.innerHTML = '';
-                lucide.createIcons();
-                return;
-            }
-
-            // 聚合分类金额
-            const catMap = {};
-            targetRecords.forEach(r => {
-                if (!catMap[r.category]) catMap[r.category] = 0;
-                catMap[r.category] += Number(r.amount);
-            });
-
-            const sortedCats = Object.keys(catMap)
-                .map(catId => ({
-                    ...getCategoryInfo(state.statType, catId),
-                    amount: catMap[catId],
-                    percent: (catMap[catId] / total) * 100
-                }))
-                .sort((a, b) => b.amount - a.amount);
-
-            // 生成原生 SVG 环形图
-            const radius = 54;
-            const circumference = 2 * Math.PI * radius;
-            let cumulativePercent = 0;
-
-            let svgSegments = '';
-            sortedCats.forEach(cat => {
-                const strokeDasharray = `${(cat.percent / 100) * circumference} ${circumference}`;
-                const strokeDashoffset = -((cumulativePercent / 100) * circumference);
-                cumulativePercent += cat.percent;
-
-                svgSegments += `
-                    <circle cx="70" cy="70" r="${radius}" fill="transparent"
-                        stroke="${cat.color}" stroke-width="18"
-                        stroke-dasharray="${strokeDasharray}"
-                        stroke-dashoffset="${strokeDashoffset}"
-                        class="transition-all duration-500" />
-                `;
-            });
-
-            chartContainer.innerHTML = `
-                <div class="relative w-[140px] h-[140px] flex items-center justify-center">
-                    <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 140 140">
-                        <circle cx="70" cy="70" r="${radius}" fill="transparent" stroke="#f1f5f9" stroke-width="18" />
-                        ${svgSegments}
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                        <span class="text-[10px] text-slate-400 font-medium">总${state.statType === 'expense' ? '支出' : '收入'}</span>
-                        <span class="text-sm font-bold text-slate-800 tabular-nums mt-0.5">¥${total >= 10000 ? (total/10000).toFixed(2)+'万' : total.toFixed(0)}</span>
-                    </div>
-                </div>
-            `;
-
-            // 生成分类占比列表
-            let listHtml = '';
-            sortedCats.forEach(cat => {
-                listHtml += `
-                    <div>
-                        <div class="flex items-center justify-between text-xs mb-1.5">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color}"></span>
-                                <span class="font-semibold text-slate-700">${cat.name}</span>
-                                <span class="text-[11px] text-slate-400 tabular-nums">${cat.percent.toFixed(1)}%</span>
-                            </div>
-                            <span class="font-bold text-slate-800 tabular-nums">${formatMoney(cat.amount)}</span>
-                        </div>
-                        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div class="h-full rounded-full transition-all duration-500" style="width: ${cat.percent}%; background-color: ${cat.color}"></div>
-                        </div>
-                    </div>
-                `;
-            });
-            listContainer.innerHTML = listHtml;
-
-            // 更新洞察文案
-            const insightEl = document.getElementById('statsInsightText');
-            if (state.statType === 'expense' && sortedCats.length > 0) {
-                const topCat = sortedCats[0];
-                const budgetRatio = budget > 0 ? Math.round((total / budget) * 100) : 0;
-                insightEl.textContent = `本周期最大开销为「${topCat.name}」（占总支出 ${topCat.percent.toFixed(0)}%），目前已消耗周期总预算的 ${budgetRatio}%。`;
-            } else if (state.statType === 'income') {
-                insightEl.textContent = `本周期累计入账 ${formatMoney(total)}，清晰的周期隔离让每一笔工资与生活费都有迹可循。`;
-            }
-
-            lucide.createIcons();
-        }
-
-        // ==================== 6. 交互事件处理 ====================
-
-        function changeCycle(delta) {
-            state.cycleOffset += delta;
-            refreshUI();
-        }
-
-        function resetToCurrentCycle() {
-            state.cycleOffset = 0;
-            refreshUI();
-            showToast('已回到当前所在周期');
-        }
-
-        function switchView(view) {
-            state.currentView = view;
-            const tabTx = document.getElementById('tabTransactions');
-            const tabSt = document.getElementById('tabStats');
-            const viewTx = document.getElementById('viewTransactions');
-            const viewSt = document.getElementById('viewStats');
-
-            if (view === 'transactions') {
-                tabTx.className = 'flex-1 py-2 text-xs font-semibold rounded-xl bg-white text-slate-900 shadow-xs transition flex items-center justify-center gap-1.5';
-                tabSt.className = 'flex-1 py-2 text-xs font-semibold rounded-xl text-slate-500 hover:text-slate-700 transition flex items-center justify-center gap-1.5';
-                viewTx.classList.remove('hidden');
-                viewSt.classList.add('hidden');
-            } else {
-                tabSt.className = 'flex-1 py-2 text-xs font-semibold rounded-xl bg-white text-slate-900 shadow-xs transition flex items-center justify-center gap-1.5';
-                tabTx.className = 'flex-1 py-2 text-xs font-semibold rounded-xl text-slate-500 hover:text-slate-700 transition flex items-center justify-center gap-1.5';
-                viewSt.classList.remove('hidden');
-                viewTx.classList.add('hidden');
-                renderStats();
-            }
-            lucide.createIcons();
-        }
-
-        function switchStatType(type) {
-            state.statType = type;
-            const btnExp = document.getElementById('statTypeExpense');
-            const btnInc = document.getElementById('statTypeIncome');
-            if (type === 'expense') {
-                btnExp.className = 'px-3 py-1 rounded-lg font-semibold bg-white text-slate-800 shadow-2xs transition';
-                btnInc.className = 'px-3 py-1 rounded-lg font-semibold text-slate-500 transition';
-            } else {
-                btnInc.className = 'px-3 py-1 rounded-lg font-semibold bg-white text-slate-800 shadow-2xs transition';
-                btnExp.className = 'px-3 py-1 rounded-lg font-semibold text-slate-500 transition';
-            }
-            renderStats();
-        }
-
-        // --- 记一笔弹窗控制 ---
-        function openRecordModal() {
-            document.getElementById('recordModal').classList.remove('hidden');
-            document.getElementById('inputAmount').value = '';
-            document.getElementById('inputNote').value = '';
-            document.getElementById('inputDate').value = formatDateISO(new Date());
-            setRecordType('expense');
-            setTimeout(() => document.getElementById('inputAmount').focus(), 100);
-        }
-
-        function closeRecordModal() {
-            document.getElementById('recordModal').classList.add('hidden');
-        }
-
-        function setRecordType(type) {
-            state.recordFormType = type;
-            const btnExp = document.getElementById('btnTypeExpense');
-            const btnInc = document.getElementById('btnTypeIncome');
-            const submitBtn = document.getElementById('btnSubmitRecord');
-
-            if (type === 'expense') {
-                btnExp.className = 'px-4 py-1.5 rounded-lg text-xs font-bold bg-rose-500 text-white shadow-xs transition';
-                btnInc.className = 'px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600 transition';
-                submitBtn.className = 'w-full py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-md transition active:scale-[0.98]';
-                state.selectedCategory = CATEGORIES.expense[0].id;
-            } else {
-                btnInc.className = 'px-4 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white shadow-xs transition';
-                btnExp.className = 'px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600 transition';
-                submitBtn.className = 'w-full py-3.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition active:scale-[0.98]';
-                state.selectedCategory = CATEGORIES.income[0].id;
-            }
-            renderCategoryGrid();
-        }
-
-        function renderCategoryGrid() {
-            const list = CATEGORIES[state.recordFormType];
-            const grid = document.getElementById('categoryGrid');
-            grid.innerHTML = list.map(cat => {
-                const isSelected = state.selectedCategory === cat.id;
-                return `
-                    <button type="button" onclick="selectCategory('${cat.id}')" 
-                        class="flex flex-col items-center justify-center p-2.5 rounded-2xl border transition ${isSelected ? 'border-brand-500 bg-brand-50/60 ring-2 ring-brand-500/20' : 'border-slate-100 bg-slate-50/70 hover:bg-slate-100'}">
-                        <div class="w-8 h-8 rounded-xl ${cat.bg} flex items-center justify-center mb-1">
-                            <i data-lucide="${cat.icon}" class="w-4 h-4"></i>
-                        </div>
-                        <span class="text-[11px] font-medium ${isSelected ? 'text-brand-800 font-bold' : 'text-slate-600'}">${cat.name}</span>
-                    </button>
-                `;
-            }).join('');
-            lucide.createIcons();
-        }
-
-        function selectCategory(catId) {
-            state.selectedCategory = catId;
-            renderCategoryGrid();
-        }
-
-        function handleSaveRecord(e) {
-            e.preventDefault();
-            const amount = parseFloat(document.getElementById('inputAmount').value);
-            const date = document.getElementById('inputDate').value;
-            const note = document.getElementById('inputNote').value.trim();
-
-            if (!amount || amount <= 0) {
-                showToast('请输入有效金额');
-                return;
-            }
-
-            const newRecord = {
-                id: 'rec_' + Date.now(),
-                type: state.recordFormType,
-                category: state.selectedCategory,
-                amount: amount,
-                date: date,
-                note: note
-            };
-
-            state.records.unshift(newRecord);
-            saveData();
-            closeRecordModal();
-            
-            // 如果记录的日期属于当前周期，重置偏移到当前周期以便用户立刻看到
-            const currentBounds = getCycleBounds(state.settings.startDay, 0);
-            if (date >= currentBounds.startStr && date <= currentBounds.endStr) {
-                state.cycleOffset = 0;
-            }
-
-            refreshUI();
-            showToast('记账成功');
-        }
-
-        function deleteRecord(id) {
-            state.records = state.records.filter(r => r.id !== id);
-            saveData();
-            refreshUI();
-            showToast('已删除该笔记录');
-        }
-
-        // --- 设置弹窗控制 ---
-        function openSettingsModal() {
-            document.getElementById('settingStartDay').value = state.settings.startDay;
-            document.getElementById('settingBudget').value = state.settings.budget;
-            updateSettingPreview();
-            document.getElementById('settingsModal').classList.remove('hidden');
-        }
-
-        function closeSettingsModal() {
-            document.getElementById('settingsModal').classList.add('hidden');
-        }
-
-        function updateSettingPreview() {
-            const day = parseInt(document.getElementById('settingStartDay').value, 10);
-            document.getElementById('previewStartDay').textContent = `每月 ${day} 日`;
-            const exampleEl = document.getElementById('previewCycleExample');
-            if (day === 1) {
-                exampleEl.innerHTML = `示例：设为每月 1 日，即按 <strong class="text-slate-700">标准自然月 (1日至月末)</strong> 统计。`;
-            } else {
-                exampleEl.innerHTML = `示例：若设为每月 ${day} 日，则记账周期为 <strong class="text-slate-700">本月${day}日 至 次月${day - 1}日</strong>。`;
-            }
-        }
-
-        function handleSaveSettings(e) {
-            e.preventDefault();
-            const newStartDay = parseInt(document.getElementById('settingStartDay').value, 10);
-            const newBudget = parseFloat(document.getElementById('settingBudget').value) || 0;
-
-            state.settings.startDay = newStartDay;
-            state.settings.budget = newBudget;
-            state.cycleOffset = 0; // 重置到基于新规则的当前周期
-
-            saveData();
-            closeSettingsModal();
-            refreshUI();
-            showToast(`已切换为每月 ${newStartDay} 日起算`);
-        }
-
-        // --- 自定义确认弹窗 (替代 confirm) ---
-        let pendingConfirmType = null;
-
-        function confirmAction(type) {
-            pendingConfirmType = type;
-            const titleEl = document.getElementById('confirmTitle');
-            const descEl = document.getElementById('confirmDesc');
-            const yesBtn = document.getElementById('btnConfirmYes');
-
-            if (type === 'resetDemo') {
-                titleEl.textContent = '恢复演示数据？';
-                descEl.textContent = '将根据您当前设定的“起始日”重新生成一组真实的周期收支演示账单。';
-                yesBtn.className = 'py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold transition';
-            } else if (type === 'clearAll') {
-                titleEl.textContent = '清空所有账单？';
-                descEl.textContent = '确定要删除全部历史记账数据吗？此操作无法撤销。';
-                yesBtn.className = 'py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition';
-            }
-
-            yesBtn.onclick = executeConfirmedAction;
-            document.getElementById('confirmModal').classList.remove('hidden');
-        }
-
-        function closeConfirmModal() {
-            document.getElementById('confirmModal').classList.add('hidden');
-            pendingConfirmType = null;
-        }
-
-        function executeConfirmedAction() {
-            if (pendingConfirmType === 'resetDemo') {
-                state.records = generateDemoRecords(state.settings.startDay);
-                state.cycleOffset = 0;
-                saveData();
-                refreshUI();
-                closeConfirmModal();
-                closeSettingsModal();
-                showToast('已生成当前周期演示数据');
-            } else if (pendingConfirmType === 'clearAll') {
-                state.records = [];
-                saveData();
-                refreshUI();
-                closeConfirmModal();
-                closeSettingsModal();
-                showToast('已清空所有账单');
-            }
-        }
-
-        // --- Toast 轻提示 ---
-        let toastTimer = null;
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastMessage').textContent = msg;
-            toast.classList.remove('opacity-0', '-translate-y-2');
-            toast.classList.add('opacity-100', 'translate-y-0');
-
-            clearTimeout(toastTimer);
-            toastTimer = setTimeout(() => {
-                toast.classList.remove('opacity-100', 'translate-y-0');
-                toast.classList.add('opacity-0', '-translate-y-2');
-            }, 2200);
-        }
-
-        // 更新顶部模拟状态栏时间
-        function updateClock() {
-            const now = new Date();
-            const h = String(now.getHours()).padStart(2, '0');
-            const m = String(now.getMinutes()).padStart(2, '0');
-            const clockEl = document.getElementById('clockDisplay');
-            if (clockEl) clockEl.textContent = `${h}:${m}`;
-        }
-
-        // ==================== 7. 初始化启动 ====================
-        window.addEventListener('DOMContentLoaded', () => {
-            updateClock();
-            setInterval(updateClock, 30000);
-            loadData();
-            refreshUI();
-        });
-    </script>
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('show');
+    }
+
+    function closeModalOnMask(e, id) {
+      if (e.target.id === id) closeModal(id);
+    }
+
+    // 注册 Service Worker 以支持 PWA 和 APK 打包
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    loadState();
+    render();
+  </script>
 </body>
 </html>
