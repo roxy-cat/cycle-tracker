@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.roxy_cat.twa",
+        "sha256_cert_fingerprints": ["C9:27:80:80:15:3C:6A:DC:FA:7D:E6:20:0F:E7:73:E2:04:09:B1:13:ED:89:70:49:93:1E:AB:91:3F:F5:C2:0D"]
+      }
+    }]
